@@ -83,12 +83,16 @@ p { text-wrap: pretty; }
 }
 .hero-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 32px 48px; padding-top: 56px; padding-bottom: 48px; }
 .hero-text { display: flex; flex: 999 1 520px; flex-direction: column; align-items: flex-start; gap: 18px; min-width: 0; }
+/* 宽度按文字算，宽屏下每条原则一行放完；手机放不下才折行 */
 .fair {
-  display: flex; flex: 1 1 320px; flex-direction: column; gap: 12px; padding: 22px 24px;
+  display: flex; flex: 0 1 auto; flex-direction: column; gap: 12px; padding: 22px 24px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: 0 8px 24px rgba(20, 22, 26, 0.05);
 }
 .fair h2 { margin: 0; font-size: 16px; }
+@media (min-width: 480px) {
+  .fair li { white-space: nowrap; }
+}
 .pill {
   display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px;
   border: 1px solid var(--border); border-radius: 999px; background: var(--surface);
