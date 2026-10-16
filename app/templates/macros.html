@@ -1,0 +1,30 @@
+{# 几个页面共用的小片段：图标、头像、提示框 #}
+
+{% macro icon(name, size=16) -%}
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{%- if name == "book" %}<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+{%- elif name == "search" %}<circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path>
+{%- elif name == "arrow" %}<path d="M5 12h14"></path><path d="M12 5l7 7-7 7"></path>
+{%- elif name == "check" %}<path d="M20 6L9 17l-5-5"></path>
+{%- elif name == "alert" %}<circle cx="12" cy="12" r="9"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path>
+{%- elif name == "clock" %}<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>
+{%- elif name == "info" %}<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path>
+{%- endif %}</svg>
+{%- endmacro %}
+
+{# 头像图盖在用户名首字母上；没下载到头像（src 为空）或加载失败时，露出首字母 #}
+{% macro avatar(src, name, size) -%}
+<span class="avatar" style="--size: {{ size }}px">
+{% if src %}<img src="{{ src }}" alt="" width="{{ size }}" height="{{ size }}" loading="lazy" onerror="this.remove()">{% endif %}
+<span aria-hidden="true">{{ name[:1]|upper }}</span>
+</span>
+{%- endmacro %}
+
+{# 提示框：error 红色是收不了，retry 橙色是稍后再试，info 蓝色是已经收录过 #}
+{% macro notice(n) -%}
+<p class="notice notice-{{ n.kind }}" role="{{ 'alert' if n.kind == 'error' else 'status' }}">
+{{ icon({"error": "alert", "retry": "clock", "info": "info"}[n.kind], 18) }}
+<span>{{ n.text }}</span>
+{% if n.kind == "info" %}<a href="/">去首页看看 →</a>{% endif %}
+</p>
+{%- endmacro %}

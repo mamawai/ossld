@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}提交项目 · ossld{% endblock %}
+{% block content %}
+{% set step = 2 if topic else 1 %}
+<div class="wrap page">
+  <div class="page-head">
+    <h1>提交开源项目</h1>
+    <p class="muted">贴上你在 LINUX DO 的「{{ required_tag }}」发布帖链接，标题、作者、发帖时间和 GitHub 仓库会自动解析出来。</p>
+  </div>
+
+  <ol class="steps" aria-label="提交步骤">
+    <li class="{{ 'done' if step > 1 else 'current' }}"{% if step == 1 %} aria-current="step"{% endif %}>
+      <span class="step-dot">{% if step > 1 %}{{ m.icon("check", 14) }}{% else %}1{% endif %}</span>贴帖子链接
+    </li>
+    <li class="step-line" aria-hidden="true"></li>
+    <li class="{{ 'current' if step == 2 }}"{% if step == 2 %} aria-current="step"{% endif %}><span class="step-dot">2</span>确认信息</li>
+    <li class="step-line" aria-hidden="true"></li>
+    <li><span class="step-dot">3</span>收录上架</li>
+  </ol>
+
+  <div class="layout">
+    <div class="main-col">
+      <form class="panel link-form" method="post" action="/submit">
+        <label class="field-label" for="link">帖子链接</label>
+        <div class="row">
+          <input id="link" name="link" type="url" required placeholder="https://linux.do/t/topic/123456" value="{{ link or '' }}">
+          <button class="btn {{ 'btn-outline' if topic else 'btn-primary' }}" type="submit">{{ "重新解析" if topic else "解析" }}</button>
+        </div>
+        {% if notice %}{{ m.notice(notice) }}{% endif %}
+        {% if topic %}<span class="ok-line">{{ m.icon("check") }}解析成功</span>{% endif %}
+      </form>
+
+      {% if topic %}
+      {% set title = topic.title|clean_title %}
+      <form class="panel confirm" method="post" action="/submit/confirm" id="confirm">
+        <input type="hidden" name="topic_id" value="{{ topic.id }}">
+        <div class="panel-head">
+          <h2>确认信息</h2>
+          <span class="muted small">以下内容来自原帖，改原帖后重新解析即可</span>
+        </div>
+
+        <div class="confirm-body">
+          <div class="confirm-fields">
+            <dl class="fields">
+              <dt>展示标题</dt>
+              <dd class="stack">
+                <strong>{{ title }}</strong>
+                {% if title != topic.title %}<span class="muted small">原标题：{{ topic.title }}</span>{% endif %}
+              </dd>
+              <dt>作者</dt>
+              <dd class="inline">{{ m.avatar(none, topic.author, 24) }}<a href="{{ topic.author_url }}" target="_blank" rel="noopener">@{{ topic.author }}</a></dd>
+              <dt>发帖时间</dt>
+              <dd>{{ topic.created_at|bjtime }}</dd>
+              <dt>标签</dt>
+              <dd class="inline">
+                {% for tag in topic.tags %}
+                <span class="tag{% if tag == required_tag %} tag-ok{% endif %}">{% if tag == required_tag %}{{ m.icon("check", 12) }}{% endif %}{{ tag }}</span>
+                {% endfor %}
+              </dd>
+            </dl>
+
+            <fieldset>
+              <legend>GitHub 仓库 <span class="muted">· 不相关的取消勾选</span></legend>
+              {% for repo in topic.github_repos %}
+              <label class="check"><input type="checkbox" name="repos" value="{{ repo }}" checked><span>{{ repo|repo_name }}</span></label>
+              {% endfor %}
+              <p class="field-error" id="none-chosen" role="alert"{% if not confirm_error %} hidden{% endif %}>至少保留一个仓库</p>
+            </fieldset>
+          </div>
+
+          <div class="confirm-preview">
+            <span class="preview-label">首页展示效果</span>
+            <article class="card card-preview">
+              <div class="cover">{{ m.icon("book", 28) }}<span class="cover-name" id="preview-cover">{{ topic.github_repos[0]|repo_name }}</span></div>
+              <div class="card-body">
+                <h3>{{ title }}</h3>
+                <div class="meta">
+                  {{ m.avatar(none, topic.author, 24) }}
+                  <span class="strong">@{{ topic.author }}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{{ topic.created_at|bjdate }} 发布</span>
+                </div>
+                <div class="repos" id="preview-repos">
+                  {% for repo in topic.github_repos %}
+                  <span class="chip" data-repo="{{ repo }}">{{ m.icon("book", 14) }}<span>{{ repo|repo_name }}</span></span>
+                  {% endfor %}
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-primary btn-lg" type="submit" id="confirm-btn">确认收录</button>
+          <a class="btn btn-text" href="/submit">取消</a>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+
+    <aside class="side">
+      <section class="panel">
+        <h2>收录规则</h2>
+        <ul class="rules">
+          <li>{{ m.icon("check") }}帖子带「{{ required_tag }}」标签</li>
+          <li>{{ m.icon("check") }}首楼里有 GitHub 仓库链接</li>
+          <li>{{ m.icon("check") }}同一个帖子只收录一次</li>
+          <li class="muted">{{ m.icon("alert") }}暂不支持需要登录或达到等级才能看的帖子</li>
+        </ul>
+      </section>
+      <section class="panel-soft">
+        <h2>我们会展示什么</h2>
+        <p>只展示原帖标题、作者、发帖时间和 GitHub 仓库，点进去都回到原帖和仓库。不搬运正文和回复。</p>
+      </section>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if topic %}
+<script>
+// 勾选仓库时同步右边的卡片预览；一个都不勾就禁用确认按钮
+(() => {
+  const boxes = [...document.querySelectorAll('#confirm input[name="repos"]')];
+  const chips = [...document.querySelectorAll("#preview-repos .chip")];
+  const cover = document.getElementById("preview-cover");
+  const button = document.getElementById("confirm-btn");
+  const error = document.getElementById("none-chosen");
+  const sync = () => {
+    const chosen = boxes.filter((b) => b.checked).map((b) => b.value);
+    chips.forEach((c) => { c.hidden = !chosen.includes(c.dataset.repo); });
+    cover.textContent = chosen.length ? chosen[0].replace("https://github.com/", "") : "（没有选仓库）";
+    button.disabled = chosen.length === 0;
+    error.hidden = chosen.length > 0;
+  };
+  boxes.forEach((b) => b.addEventListener("change", sync));
+  sync();  // 浏览器后退回来时可能保留了之前的勾选状态
+})();
+</script>
+{% endif %}
+{% endblock %}

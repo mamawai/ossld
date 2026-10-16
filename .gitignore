@@ -1,0 +1,11 @@
+# 虚拟环境
+.venv/
+
+# 数据库、下载的封面图和头像
+data/
+
+# 本地配置（LINUX DO 登录的 Client Secret 之类）
+.env
+
+__pycache__/
+*.pyc
