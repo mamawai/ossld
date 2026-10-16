@@ -109,7 +109,6 @@ def index(request: Request, added: int | None = None):
         "today": f"{today.month} 月 {today.day} 日",
         "category_counts": [(c, n) for c, n in counts.items() if n],  # 只列有项目的分类
         "added": added,
-        "active": "home",
     })
 
 

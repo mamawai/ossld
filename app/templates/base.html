@@ -14,9 +14,6 @@
       <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="1" y="1" width="28" height="28" rx="8" fill="#14161A"></rect><path d="M9 11l5 4-5 4M16 20h6" stroke="#FFFFFF" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
       <span>ossld</span>
     </a>
-    <nav class="nav" aria-label="主导航">
-      <a href="/"{% if active == "home" %} aria-current="page"{% endif %}>发现</a>
-    </nav>
     <div class="header-actions">
       {% set user = current_user(request) %}
       {% if user %}

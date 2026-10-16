@@ -67,10 +67,7 @@ p { text-wrap: pretty; }
 .header-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding-top: 14px; padding-bottom: 14px; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
 .brand:hover { color: var(--text); }
-.nav { display: flex; flex: 1 1 auto; gap: 4px; }
-.nav a { padding: 10px 12px; border-radius: 8px; color: var(--text-2); }
-.nav a[aria-current="page"] { background: var(--surface-2); color: var(--text); font-weight: 600; }
-.header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-left: auto; }
 .header-actions form { margin: 0; }
 .me { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
 
