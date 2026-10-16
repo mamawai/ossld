@@ -3,6 +3,7 @@
 本地启动：.venv\\Scripts\\uvicorn app.main:app --reload
 """
 
+import hashlib
 import random
 import time
 from datetime import datetime, timedelta, timezone
@@ -45,6 +46,8 @@ templates.env.filters["repo_name"] = lambda url: url.removeprefix("https://githu
 templates.env.filters["clean_title"] = projects.display_title
 templates.env.globals["required_tag"] = projects.REQUIRED_TAG
 templates.env.globals["categories"] = projects.CATEGORIES
+# 样式表地址带上内容指纹：文件一改地址就变，Cloudflare 和浏览器不会继续用旧缓存（Cloudflare 默认缓存 css 4 小时）
+templates.env.globals["css_version"] = hashlib.sha256((HERE / "static" / "style.css").read_bytes()).hexdigest()[:8]
 templates.env.globals["current_user"] = auth.current_user
 templates.env.globals["csrf_token"] = auth.csrf_token
 
