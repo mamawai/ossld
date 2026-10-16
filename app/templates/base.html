@@ -18,7 +18,6 @@
       <a href="/"{% if active == "home" %} aria-current="page"{% endif %}>发现</a>
     </nav>
     <div class="header-actions">
-      <a class="btn btn-outline" href="/submit">提交项目</a>
       {% set user = current_user(request) %}
       {% if user %}
       <span class="me"><span class="avatar" style="--size: 32px"><span aria-hidden="true">{{ user.username[:1]|upper }}</span></span>{{ user.username }}</span>
