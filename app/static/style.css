@@ -70,6 +70,9 @@ p { text-wrap: pretty; }
 .nav { display: flex; flex: 1 1 auto; gap: 4px; }
 .nav a { padding: 10px 12px; border-radius: 8px; color: var(--text-2); }
 .nav a[aria-current="page"] { background: var(--surface-2); color: var(--text); font-weight: 600; }
+.header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.header-actions form { margin: 0; }
+.me { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
 
 /* 首屏：白底加浅点阵 */
 .hero {
@@ -198,6 +201,13 @@ a.chip:hover { border-color: var(--border-strong); color: var(--text); }
 .panel-soft p { margin: 0; font-size: 14px; color: var(--text-2); }
 
 .link-form { gap: 10px; }
+.login-needed { align-items: center; gap: 12px; padding: 40px 24px; text-align: center; }
+.login-needed h2 { font-size: 18px; }
+.login-needed p { margin: 0; max-width: 380px; font-size: 14px; }
+.login-icon { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; background: var(--surface-2); color: var(--text-2); }
+.message { align-items: flex-start; max-width: 560px; }
+.message h1 { margin: 0; font-size: 24px; }
+.message p { margin: 0; }
 .field-label { font-size: 14px; font-weight: 600; }
 .row { display: flex; flex-wrap: wrap; gap: 10px; }
 .row input {

@@ -90,6 +90,21 @@ def check_rules(topic: Topic) -> None:
         raise RuleError("首楼里没有找到 GitHub 仓库链接，暂不收录")
 
 
+def check_submitter(username: str, silenced: bool) -> None:
+    if silenced:
+        raise RuleError(f"@{username} 在 LINUX DO 处于禁言状态，暂时不能提交")
+
+
+def check_author(topic: Topic, username: str) -> None:
+    """只有帖子作者本人能提交。
+
+    按用户名比（不分大小写）：登录拿到的和帖子里的都是当前用户名。
+    登录给的 id 和论坛的用户 id 是不是同一套编号还没核实，所以先不用 id 比。
+    """
+    if topic.author.lower() != username.lower():
+        raise RuleError(f"帖子作者是 @{topic.author}，和当前登录的账号不一致，只有作者本人可以提交")
+
+
 @contextmanager
 def _db():
     conn = sqlite3.connect(DB_PATH)

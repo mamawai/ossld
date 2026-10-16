@@ -21,19 +21,30 @@
 
   <div class="layout">
     <div class="main-col">
+      {% set user = current_user(request) %}
+      {% if not user %}
+      <div class="panel login-needed">
+        <span class="login-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span>
+        <h2>登录后才能提交</h2>
+        <p class="muted">用 LINUX DO 账号登录，只用来确认你就是帖子作者。</p>
+        <a class="btn btn-primary" href="/auth/login?next=/submit">使用 LINUX DO 登录</a>
+      </div>
+      {% else %}
       <form class="panel link-form" method="post" action="/submit">
+        <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
         <label class="field-label" for="link">帖子链接</label>
         <div class="row">
           <input id="link" name="link" type="url" required placeholder="https://linux.do/t/topic/123456" value="{{ link or '' }}">
           <button class="btn {{ 'btn-outline' if topic else 'btn-primary' }}" type="submit">{{ "重新解析" if topic else "解析" }}</button>
         </div>
         {% if notice %}{{ m.notice(notice) }}{% endif %}
-        {% if topic %}<span class="ok-line">{{ m.icon("check") }}解析成功</span>{% endif %}
+        {% if topic %}<span class="ok-line">{{ m.icon("check") }}解析成功，帖子作者就是当前登录的你</span>{% endif %}
       </form>
 
       {% if topic %}
       {% set title = topic.title|clean_title %}
       <form class="panel confirm" method="post" action="/submit/confirm" id="confirm">
+        <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
         <input type="hidden" name="topic_id" value="{{ topic.id }}">
         <div class="panel-head">
           <h2>确认信息</h2>
@@ -49,7 +60,7 @@
                 {% if title != topic.title %}<span class="muted small">原标题：{{ topic.title }}</span>{% endif %}
               </dd>
               <dt>作者</dt>
-              <dd class="inline">{{ m.avatar(none, topic.author, 24) }}<a href="{{ topic.author_url }}" target="_blank" rel="noopener">@{{ topic.author }}</a></dd>
+              <dd class="inline">{{ m.avatar(none, topic.author, 24) }}<a href="{{ topic.author_url }}" target="_blank" rel="noopener">@{{ topic.author }}</a><span class="tag tag-ok">{{ m.icon("check", 12) }}与登录账号一致</span></dd>
               <dt>发帖时间</dt>
               <dd>{{ topic.created_at|bjtime }}</dd>
               <dt>标签</dt>
@@ -97,6 +108,7 @@
         </div>
       </form>
       {% endif %}
+      {% endif %}
     </div>
 
     <aside class="side">
@@ -105,6 +117,7 @@
         <ul class="rules">
           <li>{{ m.icon("check") }}帖子带「{{ required_tag }}」标签</li>
           <li>{{ m.icon("check") }}首楼里有 GitHub 仓库链接</li>
+          <li>{{ m.icon("check") }}由帖子作者本人提交，用 LINUX DO 登录确认</li>
           <li>{{ m.icon("check") }}同一个帖子只收录一次</li>
           <li class="muted">{{ m.icon("alert") }}暂不支持需要登录或达到等级才能看的帖子</li>
         </ul>

@@ -17,7 +17,22 @@
     <nav class="nav" aria-label="主导航">
       <a href="/"{% if active == "home" %} aria-current="page"{% endif %}>发现</a>
     </nav>
-    <a class="btn btn-outline" href="/submit">提交项目</a>
+    <div class="header-actions">
+      <a class="btn btn-outline" href="/submit">提交项目</a>
+      {% set user = current_user(request) %}
+      {% if user %}
+      <span class="me"><span class="avatar" style="--size: 32px"><span aria-hidden="true">{{ user.username[:1]|upper }}</span></span>{{ user.username }}</span>
+      <form method="post" action="/auth/logout">
+        <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+        <button class="btn btn-text" type="submit">退出</button>
+      </form>
+      {% else %}
+      {# 登录完回到当前页 #}
+      <a class="btn btn-primary" href="/auth/login?next={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else ''))|urlencode }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path></svg>使用 LINUX DO 登录
+      </a>
+      {% endif %}
+    </div>
   </div>
 </header>
 <main>
