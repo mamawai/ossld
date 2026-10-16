@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ p.title|clean_title }} · ossld{% endblock %}
+{% block content %}
+{% set title = p.title|clean_title %}
+<div class="wrap detail">
+  <nav class="crumbs" aria-label="面包屑"><a href="/">发现</a> / {{ p.category }} / {{ p.github_repos[0]|repo_name }}</nav>
+
+  <section class="detail-main">
+    <a class="cover detail-cover{% if p.cover_url %} cover-img{% endif %}" href="{{ p.github_repos[0] }}" target="_blank" rel="noopener" aria-label="打开 GitHub 仓库 {{ p.github_repos[0]|repo_name }}">
+      {% if p.cover_url %}
+      <img src="{{ p.cover_url }}" alt="" width="1200" height="600">
+      {% else %}
+      {{ m.icon("book", 36) }}<span class="cover-name">{{ p.github_repos[0]|repo_name }}</span>
+      {% endif %}
+    </a>
+
+    <div class="detail-info">
+      <span class="cat-badge">{{ p.category }}</span>
+      <div class="detail-title">
+        <h1>{{ title }}</h1>
+        {% if title != p.title %}<span class="muted small">原标题：{{ p.title }}</span>{% endif %}
+      </div>
+      <div class="meta detail-meta">
+        {{ m.avatar(p.avatar_local_url, p.author, 28) }}
+        <a href="{{ p.author_url }}" target="_blank" rel="noopener">@{{ p.author }}</a>
+        <span aria-hidden="true">·</span>
+        <span>发布于 {{ p.created_at|bjtime }}</span>
+        <span aria-hidden="true">·</span>
+        <span>收录于 {{ p.added_at|bjdate }}</span>
+      </div>
+      <div class="detail-repos">
+        <span class="preview-label">GitHub 仓库</span>
+        <div class="repos-inline">
+          {% for repo in p.github_repos %}
+          <a class="chip" href="{{ repo }}" target="_blank" rel="noopener">{{ m.icon("book", 15) }}<span>{{ repo|repo_name }}</span></a>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="detail-actions">
+        <a class="btn btn-primary btn-lg" href="{{ p.url }}" target="_blank" rel="noopener">查看 L 站原帖{{ m.icon("external") }}</a>
+        <a class="btn btn-outline btn-lg" href="{{ p.github_repos[0] }}" target="_blank" rel="noopener">GitHub 仓库</a>
+      </div>
+      <span class="muted small">讨论请回到 L 站原帖，这里只做收录展示。</span>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="more-title">
+    <h2 id="more-title">@{{ p.author }} 的其他项目</h2>
+    {% if more %}
+    <div class="mini-grid">{% for q in more %}{{ m.mini_card(q) }}{% endfor %}</div>
+    {% else %}
+    <div class="empty-row">
+      <span>目前只收录了这一个项目</span>
+      <a href="{{ p.author_url }}" target="_blank" rel="noopener">看 TA 的 L 站主页 →</a>
+    </div>
+    {% endif %}
+  </section>
+
+  {% if related %}
+  <section class="block" aria-labelledby="related-title">
+    <div class="block-head">
+      <h2 id="related-title">相关项目</h2>
+      <span class="muted">同分类优先，每次打开随机挑 3 个</span>
+    </div>
+    <div class="mini-grid">{% for q in related %}{{ m.mini_card(q) }}{% endfor %}</div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

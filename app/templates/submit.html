@@ -71,12 +71,23 @@
               </dd>
             </dl>
 
+            <div class="field">
+              <label class="field-label" for="category">项目分类 <span class="required">*</span> <span class="muted">· 用于首页筛选，选最贴近的一个</span></label>
+              <select id="category" name="category" required>
+                <option value="" disabled{% if not category %} selected{% endif %}>请选择分类</option>
+                {% for c in categories %}
+                <option value="{{ c }}"{% if c == category %} selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+              </select>
+              {% if category_error %}<p class="field-error" role="alert">请选一个分类</p>{% endif %}
+            </div>
+
             <fieldset>
               <legend>GitHub 仓库 <span class="muted">· 不相关的取消勾选</span></legend>
               {% for repo in topic.github_repos %}
               <label class="check"><input type="checkbox" name="repos" value="{{ repo }}" checked><span>{{ repo|repo_name }}</span></label>
               {% endfor %}
-              <p class="field-error" id="none-chosen" role="alert"{% if not confirm_error %} hidden{% endif %}>至少保留一个仓库</p>
+              <p class="field-error" id="none-chosen" role="alert"{% if not repo_error %} hidden{% endif %}>至少保留一个仓库</p>
             </fieldset>
           </div>
 
@@ -85,6 +96,7 @@
             <article class="card card-preview">
               <div class="cover">{{ m.icon("book", 28) }}<span class="cover-name" id="preview-cover">{{ topic.github_repos[0]|repo_name }}</span></div>
               <div class="card-body">
+                <span class="cat-label" id="preview-cat">{{ category or "未选分类" }}</span>
                 <h3>{{ title }}</h3>
                 <div class="meta">
                   {{ m.avatar(none, topic.author, 24) }}
@@ -134,8 +146,11 @@
 {% block scripts %}
 {% if topic %}
 <script>
-// 勾选仓库时同步右边的卡片预览；一个都不勾就禁用确认按钮
+// 选分类、勾选仓库时同步右边的卡片预览；一个仓库都不勾就禁用确认按钮
 (() => {
+  const select = document.getElementById("category");
+  const catLabel = document.getElementById("preview-cat");
+  select.addEventListener("change", () => { catLabel.textContent = select.value; });
   const boxes = [...document.querySelectorAll('#confirm input[name="repos"]')];
   const chips = [...document.querySelectorAll("#preview-repos .chip")];
   const cover = document.getElementById("preview-cover");

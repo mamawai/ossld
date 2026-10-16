@@ -1,7 +1,9 @@
 """收录的项目：收录规则、数据库存取、仓库封面图。"""
 
+import hashlib
 import json
 import os
+import random
 import re
 import sqlite3
 import time
@@ -16,6 +18,10 @@ from curl_cffi.requests.exceptions import RequestException
 from .linuxdo import Topic, avatar_url, topic_url, user_url
 
 REQUIRED_TAG = "开源推广"
+
+# 站内固定分类，作者提交时选一个；顺序就是首页分类按钮的顺序
+CATEGORIES = ["AI 应用", "开发者工具", "自托管服务", "效率工具", "浏览器扩展与脚本", "桌面应用", "移动应用", "其他"]
+DEFAULT_CATEGORY = "其他"
 
 DB_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).resolve().parent.parent / "data" / "app.db"))
 # 封面图和头像都在收录时下载到本地，访客从我们这里加载，不直连 GitHub 和 linux.do
@@ -35,9 +41,15 @@ CREATE TABLE IF NOT EXISTS projects (
     author_avatar TEXT    NOT NULL,  -- 头像地址模板
     created_at    TEXT    NOT NULL,  -- 原帖发帖时间，UTC，ISO 格式
     github_repos  TEXT    NOT NULL,  -- JSON 数组
-    added_at      TEXT    NOT NULL   -- 收录时间，UTC，ISO 格式
+    added_at      TEXT    NOT NULL,  -- 收录时间，UTC，ISO 格式
+    category      TEXT    NOT NULL DEFAULT '其他'
 )
 """
+
+# 后来加的列：老数据库里没有，启动时补上。(列名, 加列语句)
+_ADDED_COLUMNS = [
+    ("category", "ALTER TABLE projects ADD COLUMN category TEXT NOT NULL DEFAULT '其他'"),
+]
 
 
 class RuleError(Exception):
@@ -52,10 +64,13 @@ class AlreadyCollected(RuleError):
 class Project:
     topic_id: int
     title: str
+    author_id: int
     author: str
     author_avatar: str
     created_at: datetime
     github_repos: list[str]
+    added_at: datetime
+    category: str
 
     @property
     def url(self) -> str:
@@ -121,6 +136,10 @@ def init_db() -> None:
     AVATARS_DIR.mkdir(parents=True, exist_ok=True)
     with _db() as conn:
         conn.execute(_SCHEMA)
+        have = {row["name"] for row in conn.execute("PRAGMA table_info(projects)")}
+        for name, ddl in _ADDED_COLUMNS:
+            if name not in have:
+                conn.execute(ddl)
 
 
 def exists(topic_id: int) -> bool:
@@ -128,12 +147,12 @@ def exists(topic_id: int) -> bool:
         return conn.execute("SELECT 1 FROM projects WHERE topic_id = ?", (topic_id,)).fetchone() is not None
 
 
-def add(topic: Topic, repos: list[str]) -> None:
+def add(topic: Topic, repos: list[str], category: str) -> None:
     try:
         with _db() as conn:
             conn.execute(
-                "INSERT INTO projects (topic_id, title, author_id, author, author_avatar, created_at, github_repos, added_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO projects (topic_id, title, author_id, author, author_avatar, created_at, github_repos, added_at, category)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     topic.id,
                     topic.title,
@@ -143,11 +162,17 @@ def add(topic: Topic, repos: list[str]) -> None:
                     topic.created_at.isoformat(),
                     json.dumps(repos),
                     datetime.now(timezone.utc).isoformat(),
+                    category,
                 ),
             )
     except sqlite3.IntegrityError:
         # 两个人同时提交同一个帖子时会走到这里
         raise AlreadyCollected("这个帖子已经收录过了") from None
+
+
+def set_category(topic_id: int, category: str) -> bool:
+    with _db() as conn:
+        return conn.execute("UPDATE projects SET category = ? WHERE topic_id = ?", (category, topic_id)).rowcount > 0
 
 
 def remove(topic_id: int) -> bool:
@@ -158,23 +183,60 @@ def remove(topic_id: int) -> bool:
         return conn.execute("DELETE FROM projects WHERE topic_id = ?", (topic_id,)).rowcount > 0
 
 
+def _to_project(r: sqlite3.Row) -> Project:
+    return Project(
+        topic_id=r["topic_id"],
+        title=r["title"],
+        author_id=r["author_id"],
+        author=r["author"],
+        author_avatar=r["author_avatar"],
+        created_at=datetime.fromisoformat(r["created_at"]),
+        github_repos=json.loads(r["github_repos"]),
+        added_at=datetime.fromisoformat(r["added_at"]),
+        category=r["category"],
+    )
+
+
 def list_all() -> list[Project]:
     """按收录时间从新到旧。"""
     with _db() as conn:
+        rows = conn.execute("SELECT * FROM projects ORDER BY added_at DESC").fetchall()
+    return [_to_project(r) for r in rows]
+
+
+def get(topic_id: int) -> Project | None:
+    with _db() as conn:
+        row = conn.execute("SELECT * FROM projects WHERE topic_id = ?", (topic_id,)).fetchone()
+    return _to_project(row) if row else None
+
+
+def by_author(author_id: int, exclude: int) -> list[Project]:
+    """作者的其他项目，按收录时间从新到旧。"""
+    with _db() as conn:
         rows = conn.execute(
-            "SELECT topic_id, title, author, author_avatar, created_at, github_repos FROM projects ORDER BY added_at DESC"
+            "SELECT * FROM projects WHERE author_id = ? AND topic_id != ? ORDER BY added_at DESC", (author_id, exclude)
         ).fetchall()
-    return [
-        Project(
-            topic_id=r["topic_id"],
-            title=r["title"],
-            author=r["author"],
-            author_avatar=r["author_avatar"],
-            created_at=datetime.fromisoformat(r["created_at"]),
-            github_repos=json.loads(r["github_repos"]),
-        )
-        for r in rows
-    ]
+    return [_to_project(r) for r in rows]
+
+
+def related(project: Project, n: int = 3) -> list[Project]:
+    """相关项目：同分类的优先，随机挑；不够 n 个就从其他分类里随机补。
+
+    作者自己的其他项目在详情页单独一栏，这里不重复。项目不多，直接在内存里挑。
+    """
+    others = [p for p in list_all() if p.topic_id != project.topic_id and p.author_id != project.author_id]
+    same = [p for p in others if p.category == project.category]
+    rest = [p for p in others if p.category != project.category]
+    picked = random.sample(same, min(n, len(same)))
+    return picked + random.sample(rest, min(n - len(picked), len(rest)))
+
+
+def daily_picks(projects: list[Project], day: str, n: int = 4) -> list[Project]:
+    """今日推荐：按"日期 + 帖子编号"算哈希排序取前 n 个。
+
+    同一天结果固定；当天新收录一个项目，最多挤掉一个推荐，不会整组重洗。
+    """
+    return sorted(projects, key=lambda p: hashlib.sha256(f"{day}:{p.topic_id}".encode()).digest())[:n]
 
 
 def cover_path(topic_id: int) -> Path:

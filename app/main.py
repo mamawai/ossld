@@ -3,8 +3,9 @@
 本地启动：.venv\\Scripts\\uvicorn app.main:app --reload
 """
 
+import random
 import time
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated
 
@@ -43,6 +44,7 @@ templates.env.filters["bjdate"] = lambda dt: dt.astimezone(BEIJING).strftime("%Y
 templates.env.filters["repo_name"] = lambda url: url.removeprefix("https://github.com/")
 templates.env.filters["clean_title"] = projects.display_title
 templates.env.globals["required_tag"] = projects.REQUIRED_TAG
+templates.env.globals["categories"] = projects.CATEGORIES
 templates.env.globals["current_user"] = auth.current_user
 templates.env.globals["csrf_token"] = auth.csrf_token
 
@@ -91,9 +93,33 @@ def _render_message(request: Request, title: str, text: str, status_code: int = 
 
 @app.get("/")
 def index(request: Request, added: int | None = None):
-    return templates.TemplateResponse(
-        request, "index.html", {"projects": projects.list_all(), "added": added, "active": "home"}
-    )
+    items = projects.list_all()
+    today = datetime.now(BEIJING)
+    picks = projects.daily_picks(items, today.strftime("%Y-%m-%d"))
+    # 公平展示：每次打开随机排序；刚收录的那个排第一，让作者一眼看到
+    random.shuffle(items)
+    items.sort(key=lambda p: p.topic_id != added)
+    counts = {c: sum(p.category == c for p in items) for c in projects.CATEGORIES}
+    return templates.TemplateResponse(request, "index.html", {
+        "projects": items,
+        "picks": picks,
+        "today": f"{today.month} 月 {today.day} 日",
+        "category_counts": [(c, n) for c, n in counts.items() if n],  # 只列有项目的分类
+        "added": added,
+        "active": "home",
+    })
+
+
+@app.get("/p/{topic_id}")
+def project_page(request: Request, topic_id: int):
+    project = projects.get(topic_id)
+    if project is None:
+        return _render_message(request, "没有这个项目", "可能还没收录，或者已经被删除了。", status_code=404)
+    return templates.TemplateResponse(request, "project.html", {
+        "p": project,
+        "more": projects.by_author(project.author_id, exclude=topic_id),
+        "related": projects.related(project),
+    })
 
 
 # ---------- 登录 ----------
@@ -158,6 +184,7 @@ def submit_confirm(
     background_tasks: BackgroundTasks,
     topic_id: Annotated[int, Form()],
     csrf: Annotated[str, Form()] = "",
+    category: Annotated[str, Form()] = "",
     repos: Annotated[list[str], Form()] = [],
 ):
     """预览里确认 → 收录。"""
@@ -170,10 +197,13 @@ def submit_confirm(
     if topic is None:
         return _render_submit(request, notice={"kind": "retry", "text": "预览已过期，请重新解析"})
     chosen = [r for r in topic.github_repos if r in repos]  # 只认预览时解析出来的仓库，不收表单里多塞的
-    if not chosen:
-        return _render_submit(request, link=topic.url, topic=topic, confirm_error=True)
+    if not chosen or category not in projects.CATEGORIES:
+        return _render_submit(
+            request, link=topic.url, topic=topic, category=category,
+            repo_error=not chosen, category_error=category not in projects.CATEGORIES,
+        )
     try:
-        projects.add(topic, chosen)
+        projects.add(topic, chosen, category)
     except projects.RuleError as e:
         return _render_submit(request, link=topic.url, notice=_notice(e))
     _previews.pop((user.id, topic_id), None)

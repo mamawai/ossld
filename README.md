@@ -27,9 +27,10 @@ python -m venv .venv
 ## 管理员命令
 
 ```bash
-python -m app.admin add <帖子链接>...     # 直接收录，不走网页提交流程
-python -m app.admin remove <帖子编号>...  # 删除
-python -m app.admin images               # 补下载缺失的封面图和头像
+python -m app.admin add [--category 分类] <帖子链接>...  # 直接收录，不走网页提交流程
+python -m app.admin category <帖子编号> <分类>            # 改分类
+python -m app.admin remove <帖子编号>...                 # 删除
+python -m app.admin images                              # 补下载缺失的封面图和头像
 ```
 
 ## 协议

@@ -3,105 +3,156 @@
 {% block content %}
 <section class="hero">
   <div class="wrap hero-inner">
-    <span class="pill"><span class="pill-dot"></span>LINUX DO 社区 ·「开源推广」项目集</span>
-    <h1>LINUX DO 开源的作品，都在这里。</h1>
-    <p>收录 LINUX DO「开源推广」标签下的开源项目。每个项目都附 GitHub 仓库，并链接回原帖，讨论统一回到 L 站。</p>
-    <a class="btn btn-primary btn-lg" href="/submit">提交我的项目{{ m.icon("arrow") }}</a>
+    <div class="hero-text">
+      <span class="pill"><span class="pill-dot"></span>LINUX DO 社区 ·「开源推广」项目集</span>
+      <h1>LINUX DO 开源的作品，都在这里。</h1>
+      <p>收录 LINUX DO「开源推广」标签下的开源项目。每个项目都附 GitHub 仓库，并链接回原帖，讨论统一回到 L 站。</p>
+      <a class="btn btn-primary btn-lg" href="/submit">提交我的项目{{ m.icon("arrow") }}</a>
+    </div>
+    <aside class="fair" aria-labelledby="fair-title">
+      <h2 id="fair-title">公平展示原则</h2>
+      <ul class="rules">
+        <li>{{ m.icon("check") }}列表每次打开都随机排序，新老项目机会一样</li>
+        <li>{{ m.icon("check") }}不按点赞、Star 排序，点赞只作展示</li>
+        <li>{{ m.icon("check") }}「今日推荐」每天从全部项目里随机抽 4 个</li>
+      </ul>
+    </aside>
   </div>
 </section>
 
-<section class="wrap list">
+<div class="wrap home">
   {% if added %}<p class="notice notice-ok" role="status">{{ m.icon("check", 18) }}<span>收录成功，你的项目已经排在第一个</span></p>{% endif %}
 
-  <div class="list-head">
-    <div class="list-title">
-      <h2>全部项目</h2>
-      <span class="muted" id="count">共 {{ projects|length }} 个项目 · 按收录时间从新到旧</span>
+  {% if picks %}
+  <section class="block" aria-labelledby="picks-title">
+    <div class="block-head">
+      <h2 id="picks-title">今日推荐</h2>
+      <span class="muted">{{ today }} · 每天从全部项目里随机抽 4 个</span>
     </div>
+    <div class="mini-grid">
+      {% for p in picks %}{{ m.mini_card(p) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="block" aria-labelledby="all-title">
+    <div class="list-head">
+      <div class="list-title">
+        <h2 id="all-title">全部项目</h2>
+        <span class="muted" id="count">共 {{ projects|length }} 个项目 · 每次打开随机排序</span>
+      </div>
+      {% if projects %}
+      {# 搜索、分类筛选、换顺序都靠 JS，没开 JS 时这些控件不显示 #}
+      <div class="tools" id="tools" hidden>
+        <div class="search">
+          {{ m.icon("search", 18) }}
+          <label class="sr-only" for="q">搜索项目</label>
+          <input id="q" type="search" placeholder="搜索标题、作者或仓库" autocomplete="off">
+        </div>
+        <button type="button" class="btn btn-outline" id="shuffle">{{ m.icon("shuffle") }}换个顺序</button>
+      </div>
+      {% endif %}
+    </div>
+
     {% if projects %}
-    {# 搜索靠 JS，没开 JS 时整个框不显示 #}
-    <div class="search" id="search-box" hidden>
-      {{ m.icon("search", 18) }}
-      <label class="sr-only" for="q">搜索项目</label>
-      <input id="q" type="search" placeholder="搜索标题、作者或仓库" autocomplete="off">
+    <div class="chips" role="group" aria-label="按分类筛选" id="cats" hidden>
+      <button type="button" class="chip-btn" aria-pressed="true" data-cat="">全部<span>{{ projects|length }}</span></button>
+      {% for c, n in category_counts %}
+      <button type="button" class="chip-btn" aria-pressed="false" data-cat="{{ c }}">{{ c }}<span>{{ n }}</span></button>
+      {% endfor %}
+    </div>
+
+    <div class="grid" id="grid">
+      {% for p in projects %}
+      {% set title = p.title|clean_title %}
+      <article class="card{% if p.topic_id == added %} card-new{% endif %}" data-cat="{{ p.category }}" data-search="{{ (title ~ ' ' ~ p.author ~ ' ' ~ (p.github_repos|map('repo_name')|join(' ')))|lower }}">
+        <a class="cover{% if p.cover_url %} cover-img{% endif %}" href="/p/{{ p.topic_id }}" aria-label="查看项目 {{ p.github_repos[0]|repo_name }}">
+          {% if p.cover_url %}
+          <img src="{{ p.cover_url }}" alt="" width="1200" height="600" loading="lazy">
+          {% else %}
+          {{ m.icon("book", 28) }}<span class="cover-name">{{ p.github_repos[0]|repo_name }}</span>
+          {% endif %}
+        </a>
+        <div class="card-body">
+          <span class="cat-label">{{ p.category }}</span>
+          <h3><a href="/p/{{ p.topic_id }}"{% if title != p.title %} title="原标题：{{ p.title }}"{% endif %}>{{ title }}</a></h3>
+          <div class="meta">
+            {{ m.avatar(p.avatar_local_url, p.author, 24) }}
+            <a href="{{ p.author_url }}" target="_blank" rel="noopener">@{{ p.author }}</a>
+            <span aria-hidden="true">·</span>
+            <span>{{ p.created_at|bjdate }} 发布</span>
+          </div>
+          <div class="repos">
+            {% for repo in p.github_repos %}
+            <a class="chip" href="{{ repo }}" target="_blank" rel="noopener">{{ m.icon("book", 14) }}<span>{{ repo|repo_name }}</span></a>
+            {% endfor %}
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    <div class="empty" id="no-result" hidden>
+      <strong>没有找到符合条件的项目</strong>
+      <span class="muted">换个关键词或分类试试</span>
+      <button type="button" class="btn btn-outline" id="clear">清空筛选</button>
+    </div>
+    {% else %}
+    <div class="empty">
+      <strong>还没有收录项目</strong>
+      <span class="muted">你的作品可以是第一个</span>
+      <a class="btn btn-primary" href="/submit">提交项目</a>
     </div>
     {% endif %}
-  </div>
-
-  {% if projects %}
-  <div class="grid" id="grid">
-    {% for p in projects %}
-    {% set title = p.title|clean_title %}
-    <article class="card{% if p.topic_id == added %} card-new{% endif %}" data-search="{{ (title ~ ' ' ~ p.author ~ ' ' ~ (p.github_repos|map('repo_name')|join(' ')))|lower }}">
-      <a class="cover{% if p.cover_url %} cover-img{% endif %}" href="{{ p.github_repos[0] }}" target="_blank" rel="noopener" aria-label="打开 GitHub 仓库 {{ p.github_repos[0]|repo_name }}">
-        {% if p.cover_url %}
-        <img src="{{ p.cover_url }}" alt="" width="1200" height="600" loading="lazy">
-        {% else %}
-        {{ m.icon("book", 28) }}<span class="cover-name">{{ p.github_repos[0]|repo_name }}</span>
-        {% endif %}
-      </a>
-      <div class="card-body">
-        <h3><a href="{{ p.url }}" target="_blank" rel="noopener"{% if title != p.title %} title="原标题：{{ p.title }}"{% endif %}>{{ title }}</a></h3>
-        <div class="meta">
-          {{ m.avatar(p.avatar_local_url, p.author, 24) }}
-          <a href="{{ p.author_url }}" target="_blank" rel="noopener">@{{ p.author }}</a>
-          <span aria-hidden="true">·</span>
-          <span>{{ p.created_at|bjdate }} 发布</span>
-        </div>
-        <div class="repos">
-          {% for repo in p.github_repos %}
-          <a class="chip" href="{{ repo }}" target="_blank" rel="noopener">{{ m.icon("book", 14) }}<span>{{ repo|repo_name }}</span></a>
-          {% endfor %}
-        </div>
-      </div>
-    </article>
-    {% endfor %}
-  </div>
-  <div class="empty" id="no-result" hidden>
-    <strong>没有找到和「<span id="no-result-q"></span>」相关的项目</strong>
-    <span class="muted">换个关键词试试，比如仓库名或作者用户名</span>
-    <button type="button" class="btn btn-outline" id="clear">清空搜索</button>
-  </div>
-  {% else %}
-  <div class="empty">
-    <strong>还没有收录项目</strong>
-    <span class="muted">你的作品可以是第一个</span>
-    <a class="btn btn-primary" href="/submit">提交项目</a>
-  </div>
-  {% endif %}
-</section>
+  </section>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// 首页搜索：在已经渲染好的卡片里按标题、作者、仓库名筛选，不请求后端
+// 首页：搜索 + 分类筛选 + 换个顺序，都在已经渲染好的卡片上做，不请求后端
 (() => {
-  const box = document.getElementById("search-box");
-  if (!box) return;
-  box.hidden = false;
+  const tools = document.getElementById("tools");
+  if (!tools) return;
+  tools.hidden = false;
+  document.getElementById("cats").hidden = false;
   const input = document.getElementById("q");
   const grid = document.getElementById("grid");
   const cards = [...grid.querySelectorAll(".card")];
+  const chips = [...document.querySelectorAll("#cats .chip-btn")];
   const count = document.getElementById("count");
   const total = count.textContent;
   const none = document.getElementById("no-result");
+  let cat = "";
+
   const apply = () => {
     const key = input.value.trim().toLowerCase();
     let n = 0;
     for (const card of cards) {
-      card.hidden = key !== "" && !card.dataset.search.includes(key);
+      card.hidden = (cat && card.dataset.cat !== cat) || (key !== "" && !card.dataset.search.includes(key));
       if (!card.hidden) n++;
     }
-    count.textContent = key ? `找到 ${n} 个项目` : total;
+    count.textContent = key || cat ? `找到 ${n} 个项目` : total;
     grid.hidden = n === 0;
     none.hidden = n > 0;
-    document.getElementById("no-result-q").textContent = input.value.trim();
   };
+
   input.addEventListener("input", apply);
+  chips.forEach((chip) => chip.addEventListener("click", () => {
+    cat = chip.dataset.cat;
+    chips.forEach((c) => c.setAttribute("aria-pressed", String(c === chip)));
+    apply();
+  }));
   document.getElementById("clear").addEventListener("click", () => {
     input.value = "";
-    apply();
-    input.focus();
+    chips[0].click();
+  });
+  // 换个顺序：把卡片打乱后重新放回去
+  document.getElementById("shuffle").addEventListener("click", () => {
+    for (let i = cards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cards[i], cards[j]] = [cards[j], cards[i]];
+    }
+    cards.forEach((card) => grid.appendChild(card));
   });
 })();
 </script>

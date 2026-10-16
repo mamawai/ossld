@@ -1,8 +1,9 @@
 """管理员命令行：在服务器上直接收录或删除项目，不走网页提交流程（以后也不校验作者本人）。
 
-python -m app.admin add <帖子链接>...     收录，首楼里的 GitHub 仓库全部收进来
-python -m app.admin remove <帖子编号>...  删除
-python -m app.admin images               把缺封面图或头像的项目补下载一遍
+python -m app.admin add [--category 分类] <帖子链接>...  收录，首楼里的 GitHub 仓库全部收进来
+python -m app.admin category <帖子编号> <分类>            改分类
+python -m app.admin remove <帖子编号>...                 删除
+python -m app.admin images                              把缺封面图或头像的项目补下载一遍
 """
 
 import argparse
@@ -12,14 +13,14 @@ from . import projects
 from .linuxdo import TopicError, get_topic
 
 
-def add(links: list[str]) -> None:
+def add(links: list[str], category: str) -> None:
     for i, link in enumerate(links):
         if i:
             time.sleep(16)  # 让开 linux.do 的限流间隔
         try:
             topic = get_topic(link)
             projects.check_rules(topic)
-            projects.add(topic, topic.github_repos)
+            projects.add(topic, topic.github_repos, category)
         except (TopicError, projects.RuleError) as e:
             print(f"失败 {link}：{e}")
             continue
@@ -51,7 +52,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.admin", description="管理员命令行")
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_add = sub.add_parser("add", help="收录帖子，首楼里的 GitHub 仓库全部收进来")
+    p_add.add_argument("--category", choices=projects.CATEGORIES, default=projects.DEFAULT_CATEGORY, metavar="分类",
+                       help="、".join(projects.CATEGORIES) + f"，默认「{projects.DEFAULT_CATEGORY}」")
     p_add.add_argument("links", nargs="+", metavar="帖子链接")
+    p_cat = sub.add_parser("category", help="改分类")
+    p_cat.add_argument("topic_id", type=int, metavar="帖子编号")
+    p_cat.add_argument("category", choices=projects.CATEGORIES, metavar="分类", help="、".join(projects.CATEGORIES))
     p_remove = sub.add_parser("remove", help="删除已收录的帖子")
     p_remove.add_argument("ids", nargs="+", type=int, metavar="帖子编号")
     sub.add_parser("images", help="把缺封面图或头像的项目补下载一遍")
@@ -59,7 +65,10 @@ def main() -> None:
 
     projects.init_db()
     if args.cmd == "add":
-        add(args.links)
+        add(args.links, args.category)
+    elif args.cmd == "category":
+        ok = projects.set_category(args.topic_id, args.category)
+        print(f"{args.topic_id} → {args.category}" if ok else f"没收录过 {args.topic_id}")
     elif args.cmd == "remove":
         remove(args.ids)
     else:
