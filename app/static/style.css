@@ -340,4 +340,5 @@ select:focus, input[type="text"]:focus, input[type="url"]:focus, input[type="dat
   .hero h1 { font-size: 30px; }
   .page-head h1 { font-size: 26px; }
   .panel { padding: 20px; }
+  .gh-text { display: none; }  /* 手机上只留图标，顶栏放得下 */
 }
