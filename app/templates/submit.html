@@ -47,13 +47,20 @@
             </div>
 
             <div class="field">
-              <label class="field-label" for="category">项目分类 <span class="required">*</span> <span class="muted">· 用于首页筛选，选最贴近的一个</span></label>
+              <label class="field-label" for="category">项目分类 <span class="required">*</span> <span class="muted">· 用于首页筛选，都不合适就选「自定义分类」</span></label>
               <select id="category" name="category" required>
                 <option value="" disabled{% if not f.category %} selected{% endif %}>请选择分类</option>
-                {% for c in categories %}
+                {% for c in preset_categories %}
                 <option value="{{ c }}"{% if c == f.category %} selected{% endif %}>{{ c }}</option>
                 {% endfor %}
+                <option value="{{ custom_choice }}"{% if f.category == custom_choice %} selected{% endif %}>自定义分类…</option>
               </select>
+              {# 选了「自定义分类」才显示（靠 JS；没开 JS 时一直显示）。边打字边提示已有的分类，免得同一个分类写成好几种 #}
+              <input class="custom-category" id="custom-category" name="custom_category" type="text" maxlength="{{ category_max }}" list="known-categories"
+                     placeholder="输入分类名，会提示已有的分类" aria-label="自定义分类名" value="{{ f.custom_category or '' }}">
+              <datalist id="known-categories">
+                {% for c in known_categories %}<option value="{{ c }}">{% endfor %}
+              </datalist>
             </div>
 
             <fieldset id="repos">
@@ -130,11 +137,14 @@
 
 {% block scripts %}
 <script>
-// 提交页：填表时同步右边的卡片预览；GitHub 仓库可以「再加一个」
+// 提交页：填表时同步右边的卡片预览；选了「自定义分类」才显示分类名输入框；GitHub 仓库可以「再加一个」
 (() => {
   const form = document.getElementById("submit-form");
   if (!form) return;
   const $ = (id) => document.getElementById(id);
+  const CUSTOM = {{ custom_choice|tojson }};
+  const select = $("category");
+  const customInput = $("custom-category");
   const reposBox = $("repos");
   const addBtn = $("add-repo");
   const repoInputs = () => [...reposBox.querySelectorAll('input[name="repos"]')];
@@ -148,7 +158,11 @@
   const sync = () => {
     const raw = $("title").value.trim();
     $("preview-title").textContent = raw.replace(PREFIX, "").replace(/\s+/g, " ").trim() || raw || "（标题）";
-    $("preview-cat").textContent = $("category").value || "未选分类";
+    const isCustom = select.value === CUSTOM;
+    customInput.hidden = !isCustom;
+    customInput.required = isCustom;
+    const cat = isCustom ? customInput.value.replace(/\s+/g, " ").trim() : select.value;
+    $("preview-cat").textContent = cat || "未选分类";
     $("preview-date").textContent = $("published").value ? `${$("published").value} 发布` : "（发布日期）";
     const names = [...new Set(repoInputs().map((i) => repoName(i.value)).filter(Boolean))];
     $("preview-cover").textContent = names[0] || "owner/repo";
@@ -160,6 +174,11 @@
     addBtn.hidden = repoInputs().length >= {{ max_repos }};
   };
 
+  // 刚选上「自定义分类」时，光标直接放进分类名输入框
+  select.addEventListener("change", () => {
+    sync();
+    if (select.value === CUSTOM) customInput.focus();
+  });
   addBtn.addEventListener("click", () => {
     const row = $("repo-row-tpl").content.firstElementChild.cloneNode(true);
     addBtn.before(row);

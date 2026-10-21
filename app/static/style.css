@@ -272,7 +272,7 @@ select, input[type="text"], input[type="url"], input[type="date"], input[type="p
   border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface);
   font: inherit; color: var(--text);
 }
-select, input[type="date"] { max-width: 320px; }
+select, input[type="date"], .custom-category { max-width: 320px; }
 select:focus, input[type="text"]:focus, input[type="url"]:focus, input[type="date"]:focus, input[type="password"]:focus {
   border-color: var(--link); outline: 2px solid var(--link); outline-offset: 1px;
 }

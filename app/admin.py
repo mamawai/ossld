@@ -30,7 +30,8 @@ def main() -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_cat = sub.add_parser("category", help="改分类")
     p_cat.add_argument("topic_id", type=int, metavar="帖子编号")
-    p_cat.add_argument("category", choices=projects.CATEGORIES, metavar="分类", help="、".join(projects.CATEGORIES))
+    p_cat.add_argument("category", metavar="分类",
+                       help="固定分类：" + "、".join(projects.PRESET_CATEGORIES) + "；也可以填别的名字，当作自定义分类")
     p_remove = sub.add_parser("remove", help="删除已收录的帖子")
     p_remove.add_argument("ids", nargs="+", type=int, metavar="帖子编号")
     sub.add_parser("images", help="把缺封面图的项目补下载一遍")
@@ -38,8 +39,12 @@ def main() -> None:
 
     projects.init_db()
     if args.cmd == "category":
-        ok = projects.set_category(args.topic_id, args.category)
-        print(f"{args.topic_id} → {args.category}" if ok else f"没收录过 {args.topic_id}")
+        try:
+            category = projects.clean_category(args.category)  # 和网页上自定义分类同一套规则
+        except projects.RuleError as e:
+            parser.exit(1, f"{e}\n")
+        ok = projects.set_category(args.topic_id, category)
+        print(f"{args.topic_id} → {category}" if ok else f"没收录过 {args.topic_id}")
     elif args.cmd == "remove":
         remove(args.ids)
     else:

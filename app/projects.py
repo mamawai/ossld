@@ -7,6 +7,7 @@ import random
 import re
 import sqlite3
 import time
+from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -22,12 +23,17 @@ from .linuxdo import avatar_url, parse_topic_id, topic_url, user_url
 REQUIRED_TAG = "开源推广"
 BEIJING = timezone(timedelta(hours=8))  # 中国没有夏令时，固定 +8 就行
 
-# 站内固定分类，作者提交时选一个；顺序就是首页分类按钮的顺序
-CATEGORIES = ["AI 应用", "开发者工具", "自托管服务", "效率工具", "浏览器扩展与脚本", "桌面应用", "移动应用", "其他"]
+# 站内固定分类，顺序就是首页分类按钮的顺序。都不合适的，作者可以自己起个分类名。
+# 分类不单独建表，从已收录的项目里汇总：有人用新名字提交就多一个分类，项目全删光就没了
+PRESET_CATEGORIES = ["AI 应用", "开发者工具", "自托管服务", "效率工具", "浏览器扩展与脚本", "桌面应用", "移动应用"]
+CUSTOM_CHOICE = "__custom__"  # 提交页下拉框里「自定义分类」那一项的值
 
 # 内容都是作者自己填的，给长度和个数设个上限，免得把页面撑坏
 TITLE_MAX = 100
 MAX_REPOS = 5
+CATEGORY_MAX = 12
+# 每个账号最多收录这么多项目，防止有人刷；页面上不写出来，到了上限才提示
+MAX_PROJECTS_PER_USER = 100
 
 # GitHub 的 owner、repo 允许的字符
 _GITHUB_NAME = re.compile(r"[A-Za-z0-9._-]+")
@@ -132,6 +138,8 @@ def block_reason(user: User) -> str | None:
         return f"@{user.username} 在 LINUX DO 处于禁言状态，暂时不能提交"
     if is_banned(user.id, user.username):
         return f"@{user.username} 已被管理员禁止提交项目"
+    if count_by_author(user.id) >= MAX_PROJECTS_PER_USER:
+        return f"每个账号最多提交 {MAX_PROJECTS_PER_USER} 个项目，你已经到上限了"
     return None
 
 
@@ -152,10 +160,27 @@ def github_repo(link: str) -> str | None:
     return f"https://github.com/{owner}/{repo}"
 
 
-def new_project(user: User, link: str, title: str, category: str, repos: list[str], published: str) -> Project:
+def clean_category(name: str) -> str:
+    """自定义的分类名：合并多余空格；跟已有分类只差大小写或空格的（比如「ai应用」），用已有的写法。不合格抛 RuleError。"""
+    name = re.sub(r"\s+", " ", name).strip()
+    if not name:
+        raise RuleError("请填写自定义分类")
+    if len(name) > CATEGORY_MAX:
+        raise RuleError(f"分类最多 {CATEGORY_MAX} 个字")
+    key = name.replace(" ", "").lower()
+    for existing in [*PRESET_CATEGORIES, *category_counts()]:
+        if existing.replace(" ", "").lower() == key:
+            return existing
+    return name
+
+
+def new_project(
+    user: User, link: str, title: str, category: str, custom_category: str, repos: list[str], published: str,
+) -> Project:
     """作者填的表单 → 待收录的项目。不合格就抛 RuleError。
 
     帖子内容不去 linux.do 核对，靠提交须知约束；作者就是当前登录的账号。
+    category 是下拉框选的固定分类；选了「自定义分类」时，分类名在 custom_category 里。
     """
     topic_id = parse_topic_id(link)
     if topic_id is None:
@@ -169,7 +194,9 @@ def new_project(user: User, link: str, title: str, category: str, repos: list[st
     if len(title) > TITLE_MAX:
         raise RuleError(f"标题最多 {TITLE_MAX} 个字")
 
-    if category not in CATEGORIES:
+    if category == CUSTOM_CHOICE:
+        category = clean_category(custom_category)
+    elif category not in PRESET_CATEGORIES:
         raise RuleError("请选一个分类")
 
     chosen, seen = [], set()
@@ -335,6 +362,24 @@ def get(topic_id: int) -> Project | None:
     with _db() as conn:
         row = conn.execute("SELECT * FROM projects WHERE topic_id = ?", (topic_id,)).fetchone()
     return _to_project(row) if row else None
+
+
+def count_by_author(author_id: int) -> int:
+    with _db() as conn:
+        return conn.execute("SELECT COUNT(*) FROM projects WHERE author_id = ?", (author_id,)).fetchone()[0]
+
+
+def category_counts() -> Counter[str]:
+    """已收录项目里出现过的分类 → 项目数。"""
+    with _db() as conn:
+        rows = conn.execute("SELECT category, COUNT(*) AS n FROM projects GROUP BY category").fetchall()
+    return Counter({r["category"]: r["n"] for r in rows})
+
+
+def sort_categories(counts: Counter[str]) -> list[str]:
+    """分类排序：固定分类按原来的顺序在前，自定义分类按项目数从多到少在后。只列 counts 里有的。"""
+    custom = sorted((c for c in counts if c not in PRESET_CATEGORIES), key=lambda c: (-counts[c], c))
+    return [c for c in PRESET_CATEGORIES if c in counts] + custom
 
 
 def by_author(author_id: int, exclude: int) -> list[Project]:

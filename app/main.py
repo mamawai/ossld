@@ -5,6 +5,7 @@
 
 import hashlib
 import random
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
@@ -40,9 +41,11 @@ templates.env.filters["bjdate"] = lambda dt: dt.astimezone(BEIJING).strftime("%Y
 templates.env.filters["repo_name"] = lambda url: url.removeprefix("https://github.com/")
 templates.env.filters["clean_title"] = projects.display_title
 templates.env.globals["required_tag"] = projects.REQUIRED_TAG
-templates.env.globals["categories"] = projects.CATEGORIES
+templates.env.globals["preset_categories"] = projects.PRESET_CATEGORIES
+templates.env.globals["custom_choice"] = projects.CUSTOM_CHOICE
 templates.env.globals["title_max"] = projects.TITLE_MAX
 templates.env.globals["max_repos"] = projects.MAX_REPOS
+templates.env.globals["category_max"] = projects.CATEGORY_MAX
 # 样式表地址带上内容指纹：文件一改地址就变，Cloudflare 和浏览器不会继续用旧缓存（Cloudflare 默认缓存 css 4 小时）
 templates.env.globals["css_version"] = hashlib.sha256((HERE / "static" / "style.css").read_bytes()).hexdigest()[:8]
 templates.env.globals["current_user"] = auth.current_user
@@ -61,6 +64,10 @@ def _render_submit(request: Request, **context):
     user = auth.current_user(request)
     context["blocked"] = projects.block_reason(user) if user else None  # 被禁言、被封禁的直接显示原因，不显示表单
     context["today"] = datetime.now(BEIJING).date().isoformat()  # 发布日期最晚只能选到今天
+    # 自定义分类输入框的提示列表：固定分类 + 别人自定义过的分类
+    context["known_categories"] = projects.PRESET_CATEGORIES + [
+        c for c in projects.sort_categories(projects.category_counts()) if c not in projects.PRESET_CATEGORIES
+    ]
     return templates.TemplateResponse(request, "submit.html", context)
 
 
@@ -76,12 +83,12 @@ def index(request: Request, added: int | None = None):
     # 公平展示：每次打开随机排序；刚收录的那个排第一，让作者一眼看到
     random.shuffle(items)
     items.sort(key=lambda p: p.topic_id != added)
-    counts = {c: sum(p.category == c for p in items) for c in projects.CATEGORIES}
+    counts = Counter(p.category for p in items)
     return templates.TemplateResponse(request, "index.html", {
         "projects": items,
         "picks": picks,
         "today": f"{today.month} 月 {today.day} 日",
-        "category_counts": [(c, n) for c, n in counts.items() if n],  # 只列有项目的分类
+        "category_counts": [(c, counts[c]) for c in projects.sort_categories(counts)],  # 只列有项目的分类
         "added": added,
     })
 
@@ -140,6 +147,7 @@ def submit(
     link: Annotated[str, Form()] = "",
     title: Annotated[str, Form()] = "",
     category: Annotated[str, Form()] = "",
+    custom_category: Annotated[str, Form()] = "",
     repos: Annotated[list[str], Form()] = [],
     published: Annotated[str, Form()] = "",
     agree_own: Annotated[bool, Form()] = False,
@@ -151,15 +159,15 @@ def submit(
         return _render_submit(request)  # 页面会显示"登录后才能提交"或者不能提交的原因
     # 出错时把填过的原样填回去，不用重填
     form = {
-        "link": link, "title": title, "category": category, "repos": repos, "published": published,
-        "agree_own": agree_own, "agree_promo": agree_promo,
+        "link": link, "title": title, "category": category, "custom_category": custom_category,
+        "repos": repos, "published": published, "agree_own": agree_own, "agree_promo": agree_promo,
     }
     if not auth.csrf_ok(request, csrf):
         return _render_submit(request, form=form, notice=_EXPIRED)
     try:
         if not (agree_own and agree_promo):
             raise projects.RuleError("请先勾选同意两条提交须知")
-        project = projects.new_project(user, link, title, category, repos, published)
+        project = projects.new_project(user, link, title, category, custom_category, repos, published)
         projects.add(project)
     except projects.RuleError as e:
         return _render_submit(request, form=form, notice=_notice(e))
