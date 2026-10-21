@@ -19,11 +19,11 @@
 <a class="mini" href="/p/{{ p.topic_id }}">
 <span class="cat-label">{{ p.category }}</span>
 <span class="mini-title">{{ p.title|clean_title }}</span>
-<span class="mini-meta">{{ avatar(p.avatar_local_url, p.author, 22) }}<span class="mini-author">@{{ p.author }}</span></span>
+<span class="mini-meta">{{ avatar(p.avatar_src, p.author, 22) }}<span class="mini-author">@{{ p.author }}</span></span>
 </a>
 {%- endmacro %}
 
-{# 头像图盖在用户名首字母上；没下载到头像（src 为空）或加载失败时，露出首字母 #}
+{# 头像图盖在用户名首字母上；没有头像地址（src 为空）或加载失败时，露出首字母 #}
 {% macro avatar(src, name, size) -%}
 <span class="avatar" style="--size: {{ size }}px">
 {% if src %}<img src="{{ src }}" alt="" width="{{ size }}" height="{{ size }}" loading="lazy" onerror="this.remove()">{% endif %}
@@ -31,10 +31,10 @@
 </span>
 {%- endmacro %}
 
-{# 提示框：error 红色是收不了，retry 橙色是稍后再试，info 蓝色是已经收录过 #}
+{# 提示框：ok 绿色是操作成功，error 红色是收不了，retry 橙色是稍后再试，info 蓝色是已经收录过 #}
 {% macro notice(n) -%}
 <p class="notice notice-{{ n.kind }}" role="{{ 'alert' if n.kind == 'error' else 'status' }}">
-{{ icon({"error": "alert", "retry": "clock", "info": "info"}[n.kind], 18) }}
+{{ icon({"ok": "check", "error": "alert", "retry": "clock", "info": "info"}[n.kind], 18) }}
 <span>{{ n.text }}</span>
 {% if n.kind == "info" %}<a href="/">去首页看看 →</a>{% endif %}
 </p>

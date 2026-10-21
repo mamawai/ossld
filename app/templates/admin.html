@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}管理后台 · OssLD{% endblock %}
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+<div class="wrap page">
+  {% if not is_admin %}
+  <div class="panel admin-login">
+    <h1>管理后台</h1>
+    {% if not enabled %}
+    <p class="muted">服务器没有设置 ADMIN_PASSWORD，后台没有开启。</p>
+    {% else %}
+    <form method="post" action="/admin/login">
+      <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+      <label class="field-label" for="password">管理员密码</label>
+      <input id="password" name="password" type="password" required autocomplete="current-password" autofocus>
+      {% if notice %}{{ m.notice(notice) }}{% endif %}
+      <button class="btn btn-primary" type="submit">登录</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% else %}
+  <div class="page-head admin-head">
+    <div>
+      <h1>管理后台</h1>
+      <p class="muted">共 {{ projects|length }} 个项目 · 封禁了 {{ bans|length }} 个账号</p>
+    </div>
+    <form method="post" action="/admin/logout">
+      <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+      <button class="btn btn-outline" type="submit">退出后台</button>
+    </form>
+  </div>
+  {% if notice %}{{ m.notice(notice) }}{% endif %}
+
+  <section class="panel">
+    <h2>全部项目</h2>
+    {% if projects %}
+    <ul class="admin-list">
+      {% for p in projects %}
+      {% set title = p.title|clean_title %}
+      {% set banned = p.author_id in banned_ids or p.author|lower in banned_names %}
+      <li class="admin-item">
+        <div class="admin-info">
+          <a class="strong" href="/p/{{ p.topic_id }}" target="_blank" rel="noopener">{{ title }}</a>
+          <span class="muted small">
+            <a href="{{ p.author_url }}" target="_blank" rel="noopener">@{{ p.author }}</a>{% if banned %} <span class="banned-tag">已封禁</span>{% endif %}
+            · <a href="{{ p.url }}" target="_blank" rel="noopener">帖子 {{ p.topic_id }}</a>
+            · 收录于 {{ p.added_at|bjdate }}
+          </span>
+        </div>
+        <div class="admin-actions">
+          <form method="post" action="/admin/delete" data-confirm="确定删除「{{ title }}」吗？">
+            <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+            <input type="hidden" name="topic_id" value="{{ p.topic_id }}">
+            <button class="btn btn-outline" type="submit">删除项目</button>
+          </form>
+          {% if not banned %}
+          {# 点开才出现确认按钮，相当于二次确认 #}
+          <details class="ban">
+            <summary class="btn btn-outline">封禁作者</summary>
+            <form class="ban-form" method="post" action="/admin/ban">
+              <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+              <input type="hidden" name="topic_id" value="{{ p.topic_id }}">
+              <label class="check"><input type="checkbox" name="delete_all" value="1"><span>同时删除 @{{ p.author }} 的全部项目</span></label>
+              <button class="btn btn-primary" type="submit">确认封禁 @{{ p.author }}</button>
+            </form>
+          </details>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">还没有收录项目</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>已封禁的账号</h2>
+    {% if bans %}
+    <ul class="admin-list">
+      {% for b in bans %}
+      <li class="admin-item">
+        <div class="admin-info">
+          <span class="strong">@{{ b.username }}</span>
+          <span class="muted small">用户 id {{ b.user_id }} · 封禁于 {{ b.banned_at|bjdate }}</span>
+        </div>
+        <form method="post" action="/admin/unban" data-confirm="确定解封 @{{ b.username }} 吗？">
+          <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
+          <input type="hidden" name="user_id" value="{{ b.user_id }}">
+          <button class="btn btn-outline" type="submit">解封</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">没有封禁的账号</p>
+    {% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if is_admin %}
+<script>
+// 删除、解封前弹窗确认；提示文字放在 data-confirm 里，模板会自动转义
+document.querySelectorAll("form[data-confirm]").forEach((form) => {
+  form.addEventListener("submit", (e) => {
+    if (!confirm(form.dataset.confirm)) e.preventDefault();
+  });
+});
+</script>
+{% endif %}
+{% endblock %}

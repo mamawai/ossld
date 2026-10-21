@@ -22,10 +22,10 @@
         {% if title != p.title %}<span class="muted small">原标题：{{ p.title }}</span>{% endif %}
       </div>
       <div class="meta detail-meta">
-        {{ m.avatar(p.avatar_local_url, p.author, 28) }}
+        {{ m.avatar(p.avatar_src, p.author, 28) }}
         <a href="{{ p.author_url }}" target="_blank" rel="noopener">@{{ p.author }}</a>
         <span aria-hidden="true">·</span>
-        <span>发布于 {{ p.created_at|bjtime }}</span>
+        <span>发布于 {{ p.created_at|bjdate }}</span>
         <span aria-hidden="true">·</span>
         <span>收录于 {{ p.added_at|bjdate }}</span>
       </div>

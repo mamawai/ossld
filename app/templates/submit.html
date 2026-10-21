@@ -2,22 +2,11 @@
 {% import "macros.html" as m %}
 {% block title %}提交项目 · OssLD{% endblock %}
 {% block content %}
-{% set step = 2 if topic else 1 %}
 <div class="wrap page">
   <div class="page-head">
     <h1>提交开源项目</h1>
-    <p class="muted">贴上你在 LINUX DO 的「{{ required_tag }}」发布帖链接，标题、作者、发帖时间和 GitHub 仓库会自动解析出来。</p>
+    <p class="muted">填写你在 LINUX DO 发的「{{ required_tag }}」帖子信息，收录后作者显示为当前登录的账号。</p>
   </div>
-
-  <ol class="steps" aria-label="提交步骤">
-    <li class="{{ 'done' if step > 1 else 'current' }}"{% if step == 1 %} aria-current="step"{% endif %}>
-      <span class="step-dot">{% if step > 1 %}{{ m.icon("check", 14) }}{% else %}1{% endif %}</span>贴帖子链接
-    </li>
-    <li class="step-line" aria-hidden="true"></li>
-    <li class="{{ 'current' if step == 2 }}"{% if step == 2 %} aria-current="step"{% endif %}><span class="step-dot">2</span>确认信息</li>
-    <li class="step-line" aria-hidden="true"></li>
-    <li><span class="step-dot">3</span>收录上架</li>
-  </ol>
 
   <div class="layout">
     <div class="main-col">
@@ -26,100 +15,100 @@
       <div class="panel login-needed">
         <span class="login-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span>
         <h2>登录后才能提交</h2>
-        <p class="muted">用 LINUX DO 账号登录，只用来确认你就是帖子作者。</p>
+        <p class="muted">用 LINUX DO 账号登录，收录后作者显示为你的账号。</p>
         <a class="btn btn-primary" href="/auth/login?next=/submit">使用 LINUX DO 登录</a>
       </div>
+      {% elif blocked %}
+      <div class="panel login-needed">
+        <span class="login-icon">{{ m.icon("alert", 22) }}</span>
+        <h2>暂时不能提交</h2>
+        <p class="muted">{{ blocked }}</p>
+      </div>
       {% else %}
-      <form class="panel link-form" method="post" action="/submit">
+      {% set f = form or {} %}
+      <form class="panel confirm" method="post" action="/submit" id="submit-form">
         <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
-        <label class="field-label" for="link">帖子链接</label>
-        <div class="row">
-          <input id="link" name="link" type="url" required placeholder="https://linux.do/t/topic/123456" value="{{ link or '' }}">
-          <button class="btn {{ 'btn-outline' if topic else 'btn-primary' }}" type="submit">{{ "重新解析" if topic else "解析" }}</button>
+        <div class="panel-head">
+          <h2>项目信息</h2>
+          <span class="muted small">作者：@{{ user.username }}（当前登录账号）</span>
         </div>
         {% if notice %}{{ m.notice(notice) }}{% endif %}
-        {% if topic %}<span class="ok-line">{{ m.icon("check") }}解析成功，帖子作者就是当前登录的你</span>{% endif %}
-      </form>
-
-      {% if topic %}
-      {% set title = topic.title|clean_title %}
-      <form class="panel confirm" method="post" action="/submit/confirm" id="confirm">
-        <input type="hidden" name="csrf" value="{{ csrf_token(request) }}">
-        <input type="hidden" name="topic_id" value="{{ topic.id }}">
-        <div class="panel-head">
-          <h2>确认信息</h2>
-          <span class="muted small">以下内容来自原帖，改原帖后重新解析即可</span>
-        </div>
 
         <div class="confirm-body">
           <div class="confirm-fields">
-            <dl class="fields">
-              <dt>展示标题</dt>
-              <dd class="stack">
-                <strong>{{ title }}</strong>
-                {% if title != topic.title %}<span class="muted small">原标题：{{ topic.title }}</span>{% endif %}
-              </dd>
-              <dt>作者</dt>
-              <dd class="inline">{{ m.avatar(none, topic.author, 24) }}<a href="{{ topic.author_url }}" target="_blank" rel="noopener">@{{ topic.author }}</a><span class="tag tag-ok">{{ m.icon("check", 12) }}与登录账号一致</span></dd>
-              <dt>发帖时间</dt>
-              <dd>{{ topic.created_at|bjtime }}</dd>
-              <dt>标签</dt>
-              <dd class="inline">
-                {% for tag in topic.tags %}
-                <span class="tag{% if tag == required_tag %} tag-ok{% endif %}">{% if tag == required_tag %}{{ m.icon("check", 12) }}{% endif %}{{ tag }}</span>
-                {% endfor %}
-              </dd>
-            </dl>
+            <div class="field">
+              <label class="field-label" for="link">帖子链接 <span class="required">*</span></label>
+              <input id="link" name="link" type="url" required placeholder="https://linux.do/t/topic/123456" value="{{ f.link or '' }}">
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="title">标题 <span class="required">*</span> <span class="muted">· 和帖子标题一致，开头的【开源推广】展示时会去掉</span></label>
+              <input id="title" name="title" type="text" required maxlength="{{ title_max }}" value="{{ f.title or '' }}">
+            </div>
 
             <div class="field">
               <label class="field-label" for="category">项目分类 <span class="required">*</span> <span class="muted">· 用于首页筛选，选最贴近的一个</span></label>
               <select id="category" name="category" required>
-                <option value="" disabled{% if not category %} selected{% endif %}>请选择分类</option>
+                <option value="" disabled{% if not f.category %} selected{% endif %}>请选择分类</option>
                 {% for c in categories %}
-                <option value="{{ c }}"{% if c == category %} selected{% endif %}>{{ c }}</option>
+                <option value="{{ c }}"{% if c == f.category %} selected{% endif %}>{{ c }}</option>
                 {% endfor %}
               </select>
-              {% if category_error %}<p class="field-error" role="alert">请选一个分类</p>{% endif %}
             </div>
 
-            <fieldset>
-              <legend>GitHub 仓库 <span class="muted">· 不相关的取消勾选</span></legend>
-              {% for repo in topic.github_repos %}
-              <label class="check"><input type="checkbox" name="repos" value="{{ repo }}" checked><span>{{ repo|repo_name }}</span></label>
+            <fieldset id="repos">
+              <legend>GitHub 仓库 <span class="required">*</span> <span class="muted">· 第一个用作封面，最多 {{ max_repos }} 个</span></legend>
+              {% for repo in f.repos or [""] %}
+              <div class="repo-row">
+                <input name="repos" type="url" placeholder="https://github.com/owner/repo" aria-label="GitHub 仓库地址" value="{{ repo }}"{% if loop.first %} required{% endif %}>
+                {% if not loop.first %}<button class="btn btn-text" type="button" data-remove>删除</button>{% endif %}
+              </div>
               {% endfor %}
-              <p class="field-error" id="none-chosen" role="alert"{% if not repo_error %} hidden{% endif %}>至少保留一个仓库</p>
+              {# 加输入框靠 JS，没开 JS 时只能填一个 #}
+              <button class="btn btn-outline add-repo" type="button" id="add-repo" hidden>再加一个</button>
             </fieldset>
+
+            <div class="field">
+              <label class="field-label" for="published">发布日期 <span class="required">*</span> <span class="muted">· 帖子发出的那天</span></label>
+              <input id="published" name="published" type="date" required max="{{ today }}" value="{{ f.published or '' }}">
+            </div>
           </div>
 
-          <div class="confirm-preview">
+          {# 预览靠 JS 跟着表单变，没开 JS 时不显示 #}
+          <div class="confirm-preview" id="preview" hidden>
             <span class="preview-label">首页展示效果</span>
             <article class="card card-preview">
-              <div class="cover">{{ m.icon("book", 28) }}<span class="cover-name" id="preview-cover">{{ topic.github_repos[0]|repo_name }}</span></div>
+              <div class="cover">{{ m.icon("book", 28) }}<span class="cover-name" id="preview-cover"></span></div>
               <div class="card-body">
-                <span class="cat-label" id="preview-cat">{{ category or "未选分类" }}</span>
-                <h3>{{ title }}</h3>
+                <span class="cat-label" id="preview-cat"></span>
+                <h3 id="preview-title"></h3>
                 <div class="meta">
-                  {{ m.avatar(none, topic.author, 24) }}
-                  <span class="strong">@{{ topic.author }}</span>
+                  {{ m.avatar(none, user.username, 24) }}
+                  <span class="strong">@{{ user.username }}</span>
                   <span aria-hidden="true">·</span>
-                  <span>{{ topic.created_at|bjdate }} 发布</span>
+                  <span id="preview-date"></span>
                 </div>
-                <div class="repos" id="preview-repos">
-                  {% for repo in topic.github_repos %}
-                  <span class="chip" data-repo="{{ repo }}">{{ m.icon("book", 14) }}<span>{{ repo|repo_name }}</span></span>
-                  {% endfor %}
-                </div>
+                <div class="repos" id="preview-repos"></div>
               </div>
             </article>
           </div>
         </div>
 
+        <fieldset class="agree">
+          <legend>提交须知 <span class="required">*</span> <span class="muted">· 两条都要勾选</span></legend>
+          <label class="check"><input type="checkbox" name="agree_own" value="1" required{% if f.agree_own %} checked{% endif %}><span>1、请上传自己的项目</span></label>
+          <label class="check"><input type="checkbox" name="agree_promo" value="1" required{% if f.agree_promo %} checked{% endif %}><span>2、请上传开源推广帖子内容</span></label>
+          <p class="muted small">否则网站有权清理或封禁账号。</p>
+        </fieldset>
+
         <div class="actions">
-          <button class="btn btn-primary btn-lg" type="submit" id="confirm-btn">确认收录</button>
-          <a class="btn btn-text" href="/submit">取消</a>
+          <button class="btn btn-primary btn-lg" type="submit">提交收录</button>
+          <span class="motto">请记住：真诚、友善、团结、专业</span>
         </div>
       </form>
-      {% endif %}
+
+      <template id="repo-row-tpl"><div class="repo-row"><input name="repos" type="url" placeholder="https://github.com/owner/repo" aria-label="GitHub 仓库地址"><button class="btn btn-text" type="button" data-remove>删除</button></div></template>
+      <template id="chip-tpl"><span class="chip">{{ m.icon("book", 14) }}<span></span></span></template>
       {% endif %}
     </div>
 
@@ -127,16 +116,14 @@
       <section class="panel">
         <h2>收录规则</h2>
         <ul class="rules">
-          <li>{{ m.icon("check") }}帖子带「{{ required_tag }}」标签</li>
-          <li>{{ m.icon("check") }}首楼里有 GitHub 仓库链接</li>
-          <li>{{ m.icon("check") }}由帖子作者本人提交，用 LINUX DO 登录确认</li>
+          <li>{{ m.icon("check") }}你自己在 LINUX DO 发的「{{ required_tag }}」帖子</li>
+          <li>{{ m.icon("check") }}至少有一个 GitHub 仓库</li>
           <li>{{ m.icon("check") }}同一个帖子只收录一次</li>
-          <li class="muted">{{ m.icon("alert") }}暂不支持需要登录或达到等级才能看的帖子</li>
         </ul>
       </section>
       <section class="panel-soft">
         <h2>我们会展示什么</h2>
-        <p>只展示原帖标题、作者、发帖时间和 GitHub 仓库，点进去都回到原帖和仓库。不搬运正文和回复。</p>
+        <p>只展示你填的标题、分类、发布日期、GitHub 仓库和你的 LINUX DO 账号，点进去都回到原帖和仓库。不搬运正文和回复。</p>
       </section>
     </aside>
   </div>
@@ -144,28 +131,55 @@
 {% endblock %}
 
 {% block scripts %}
-{% if topic %}
 <script>
-// 选分类、勾选仓库时同步右边的卡片预览；一个仓库都不勾就禁用确认按钮
+// 提交页：填表时同步右边的卡片预览；GitHub 仓库可以「再加一个」
 (() => {
-  const select = document.getElementById("category");
-  const catLabel = document.getElementById("preview-cat");
-  select.addEventListener("change", () => { catLabel.textContent = select.value; });
-  const boxes = [...document.querySelectorAll('#confirm input[name="repos"]')];
-  const chips = [...document.querySelectorAll("#preview-repos .chip")];
-  const cover = document.getElementById("preview-cover");
-  const button = document.getElementById("confirm-btn");
-  const error = document.getElementById("none-chosen");
-  const sync = () => {
-    const chosen = boxes.filter((b) => b.checked).map((b) => b.value);
-    chips.forEach((c) => { c.hidden = !chosen.includes(c.dataset.repo); });
-    cover.textContent = chosen.length ? chosen[0].replace("https://github.com/", "") : "（没有选仓库）";
-    button.disabled = chosen.length === 0;
-    error.hidden = chosen.length > 0;
+  const form = document.getElementById("submit-form");
+  if (!form) return;
+  const $ = (id) => document.getElementById(id);
+  const reposBox = $("repos");
+  const addBtn = $("add-repo");
+  const repoInputs = () => [...reposBox.querySelectorAll('input[name="repos"]')];
+  // 和 projects.display_title 同一个规则：去掉开头带「开源」的方括号前缀
+  const PREFIX = /^(?:\s*[【\[][^】\]]*开源[^】\]]*[】\]])+\s*/;
+  const repoName = (url) => {
+    const m = url.trim().match(/^https?:\/\/(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+)/i);
+    return m ? `${m[1]}/${m[2].replace(/\.git$/, "")}` : "";
   };
-  boxes.forEach((b) => b.addEventListener("change", sync));
-  sync();  // 浏览器后退回来时可能保留了之前的勾选状态
+
+  const sync = () => {
+    const raw = $("title").value.trim();
+    $("preview-title").textContent = raw.replace(PREFIX, "").replace(/\s+/g, " ").trim() || raw || "（标题）";
+    $("preview-cat").textContent = $("category").value || "未选分类";
+    $("preview-date").textContent = $("published").value ? `${$("published").value} 发布` : "（发布日期）";
+    const names = [...new Set(repoInputs().map((i) => repoName(i.value)).filter(Boolean))];
+    $("preview-cover").textContent = names[0] || "owner/repo";
+    $("preview-repos").replaceChildren(...names.map((name) => {
+      const chip = $("chip-tpl").content.firstElementChild.cloneNode(true);
+      chip.querySelector("span").textContent = name;
+      return chip;
+    }));
+    addBtn.hidden = repoInputs().length >= {{ max_repos }};
+  };
+
+  addBtn.addEventListener("click", () => {
+    const row = $("repo-row-tpl").content.firstElementChild.cloneNode(true);
+    addBtn.before(row);
+    row.querySelector("input").focus();
+    sync();
+  });
+  // 删除按钮只在后加的输入框上有；用事件委托，新加的行也管得到
+  reposBox.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-remove]");
+    if (btn) {
+      btn.closest(".repo-row").remove();
+      sync();
+    }
+  });
+  form.addEventListener("input", sync);
+  form.addEventListener("change", sync);
+  $("preview").hidden = false;
+  sync();
 })();
 </script>
-{% endif %}
 {% endblock %}

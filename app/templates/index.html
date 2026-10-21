@@ -77,7 +77,7 @@
           <span class="cat-label">{{ p.category }}</span>
           <h3><a href="/p/{{ p.topic_id }}"{% if title != p.title %} title="原标题：{{ p.title }}"{% endif %}>{{ title }}</a></h3>
           <div class="meta">
-            {{ m.avatar(p.avatar_local_url, p.author, 24) }}
+            {{ m.avatar(p.avatar_src, p.author, 24) }}
             <a href="{{ p.author_url }}" target="_blank" rel="noopener">@{{ p.author }}</a>
             <span aria-hidden="true">·</span>
             <span>{{ p.created_at|bjdate }} 发布</span>

@@ -1,14 +1,18 @@
-"""LINUX DO 登录（Connect OAuth2）和表单防伪造。
+"""LINUX DO 登录（Connect OAuth2）、管理后台的密码登录、表单防伪造。
 
 配置从环境变量读：
   LINUXDO_CLIENT_ID / LINUXDO_CLIENT_SECRET  在 connect.linux.do 申请的应用凭据
   OAUTH_REDIRECT_URI                         和申请时填的回调地址一字不差，默认 https://ossld.com/auth/callback
   SESSION_SECRET                             给登录 Cookie 签名的密钥，线上必须固定，不然每次重启所有人都掉登录
   COOKIE_SECURE                              默认 1（Cookie 只走 https）；本地用 http 调试时设成 0
+  ADMIN_PASSWORD                             管理后台 /admin 的密码，用一长串随机字符；不设就不开后台
 """
 
+import math
 import os
 import secrets
+import threading
+import time
 from dataclasses import dataclass
 from urllib.parse import urlencode
 
@@ -27,6 +31,16 @@ REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", "https://ossld.com/auth/call
 SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "1") != "0"
 
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+ADMIN_TTL = 24 * 3600  # 管理员登录一天后失效，要重新输密码
+
+# 防暴力猜密码：10 分钟内输错 5 次就暂停登录，等最早那次满 10 分钟再放开。
+# 全站一起算、不按 IP 算：网站在 Cloudflare 后面，拿到的 IP 不可靠；真被人故意锁住，还能在服务器上用命令行管理
+_ADMIN_MAX_FAILS = 5
+_ADMIN_FAIL_WINDOW = 600
+_admin_fails: list[float] = []  # 最近输错密码的时间
+_admin_lock = threading.Lock()
+
 
 class LoginError(Exception):
     """登录过程中出错；异常信息直接展示给用户。"""
@@ -38,6 +52,7 @@ class User:
     username: str
     trust_level: int
     silenced: bool
+    avatar_template: str = ""  # 登录接口没给头像、或者是加这个字段之前登录的，就是空
 
 
 def enabled() -> bool:
@@ -94,18 +109,47 @@ def finish_login(request: Request, code: str, state: str) -> str:
         raise LoginError("连不上 LINUX DO，请稍后再试") from e
     if not info.get("active", True):
         raise LoginError("这个 LINUX DO 账号还没激活")
-    # 只存认人要用的几项；access token 用完就丢，不存
+    # 只存认人和收录要用的几项；access token 用完就丢，不存
     request.session["user"] = {
         "id": info["id"],
         "username": info["username"],
         "trust_level": info.get("trust_level", 0),
         "silenced": bool(info.get("silenced")),
+        "avatar_template": info.get("avatar_template") or "",
     }
     return pending["next"]
 
 
 def logout(request: Request) -> None:
     request.session.pop("user", None)
+
+
+def admin_enabled() -> bool:
+    return bool(ADMIN_PASSWORD)
+
+
+def is_admin(request: Request) -> bool:
+    logged_in_at = request.session.get("admin_at")
+    return admin_enabled() and logged_in_at is not None and time.time() - logged_in_at < ADMIN_TTL
+
+
+def admin_login(request: Request, password: str) -> None:
+    """核对管理员密码，对了就在会话里记下登录时间。错了抛 LoginError。"""
+    with _admin_lock:
+        now = time.monotonic()
+        _admin_fails[:] = [t for t in _admin_fails if now - t < _ADMIN_FAIL_WINDOW]
+        if len(_admin_fails) >= _ADMIN_MAX_FAILS:
+            wait = _ADMIN_FAIL_WINDOW - (now - _admin_fails[0])
+            raise LoginError(f"密码输错太多次，请 {math.ceil(wait / 60)} 分钟后再试")
+        # 转成字节再比：compare_digest 比字符串只认 ASCII，密码里有中文会报错
+        if not admin_enabled() or not secrets.compare_digest(password.encode(), ADMIN_PASSWORD.encode()):
+            _admin_fails.append(now)
+            raise LoginError("密码不对")
+    request.session["admin_at"] = time.time()
+
+
+def admin_logout(request: Request) -> None:
+    request.session.pop("admin_at", None)
 
 
 def csrf_token(request: Request) -> str:
