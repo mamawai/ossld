@@ -94,16 +94,14 @@
           </div>
         </div>
 
-        <fieldset class="agree">
+        <fieldset>
           <legend>提交须知 <span class="required">*</span> <span class="muted">· 两条都要勾选</span></legend>
           <label class="check"><input type="checkbox" name="agree_own" value="1" required{% if f.agree_own %} checked{% endif %}><span>1、请上传自己的项目</span></label>
           <label class="check"><input type="checkbox" name="agree_promo" value="1" required{% if f.agree_promo %} checked{% endif %}><span>2、请上传开源推广帖子内容</span></label>
-          <p class="muted small">否则网站有权清理或封禁账号。</p>
         </fieldset>
 
         <div class="actions">
           <button class="btn btn-primary btn-lg" type="submit">提交收录</button>
-          <span class="motto">请记住：真诚、友善、团结、专业</span>
         </div>
       </form>
 

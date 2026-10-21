@@ -257,14 +257,12 @@ legend .muted { font-weight: 400; }
 .check:has(input:checked) { border-color: var(--border-strong); }
 .check input { flex: none; width: 18px; height: 18px; accent-color: var(--text); }
 .check span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.agree p { margin: 0; }
 
 .repo-row { display: flex; gap: 10px; }
 .repo-row input { flex: 1; }
 .add-repo { align-self: flex-start; }
 
-.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-top: 20px; border-top: 1px solid var(--divider); }
-.motto { font-size: 14px; font-weight: 600; color: var(--text-2); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-top: 20px; border-top: 1px solid var(--divider); }
 
 .field { display: flex; flex-direction: column; gap: 8px; }
 .field .muted { font-weight: 400; }
